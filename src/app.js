@@ -264,22 +264,147 @@ function renderAuthPage({
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
   <style>
-    :root { color-scheme: light; font-family: Arial, "Noto Sans TC", sans-serif; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f7f7f5; color: #1f2328; }
-    main { width: min(430px, calc(100vw - 32px)); background: #fff; border: 1px solid #d9d9d6; border-radius: 8px; padding: 30px; box-shadow: 0 18px 45px rgb(0 0 0 / 8%); }
-    h1 { margin: 0 0 16px; font-size: 26px; line-height: 1.25; }
-    label, .field-label { display: grid; gap: 8px; margin: 16px 0; font-size: 14px; font-weight: 600; }
-    input { box-sizing: border-box; width: 100%; border: 1px solid #c8c8c4; border-radius: 6px; padding: 12px; font-size: 16px; }
-    input:focus { outline: 2px solid #111; outline-offset: 2px; }
-    .account-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; overflow: hidden; border: 1px solid #c8c8c4; border-radius: 6px; background: #fff; }
-    .account-field:focus-within { outline: 2px solid #111; outline-offset: 2px; }
-    .account-field input { min-width: 0; border: 0; border-radius: 0; }
-    .account-field input:focus { outline: 0; }
-    .account-domain { align-self: stretch; display: grid; place-items: center; border-left: 1px solid #d9d9d6; padding: 0 12px; color: #5b5f66; background: #fafafa; font-size: 15px; font-weight: 700; white-space: nowrap; }
-    button { width: 100%; border: 0; border-radius: 6px; padding: 13px 14px; margin-top: 10px; background: #111; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; }
-    p { margin: 0 0 18px; color: #5b5f66; line-height: 1.6; }
-    .hint { margin-top: 18px; text-align: center; font-size: 14px; }
-    a { color: #111; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    :root {
+      color-scheme: light;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --bg-page: #f8fafc;
+      --bg-card: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      --input-border: #cbd5e1;
+      --primary: #0f172a;
+      --primary-hover: #1e293b;
+      --primary-focus: rgba(15, 23, 42, 0.08);
+      --accent: #0284c7;
+      --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: var(--bg-page);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    main {
+      width: min(420px, 100%);
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 36px 32px;
+      box-shadow: var(--shadow);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+    }
+
+    p {
+      margin: 0 0 24px;
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    label, .field-label {
+      display: block;
+      margin-bottom: 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .account-domain {
+      text-transform: none;
+      letter-spacing: normal;
+      color: var(--accent);
+      font-weight: 500;
+      margin-left: 4px;
+    }
+
+    input {
+      box-sizing: border-box;
+      width: 100%;
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 15px;
+      margin-top: 6px;
+      font-family: var(--font-sans);
+      color: var(--text-main);
+      background-color: #ffffff;
+      transition: all 0.15s ease-in-out;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: normal;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-focus);
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 8px;
+      padding: 13px 14px;
+      margin-top: 8px;
+      background: var(--primary);
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font-sans);
+      transition: all 0.15s ease-in-out;
+    }
+
+    button:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .hint {
+      margin: 24px 0 0;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+      text-transform: none;
+      letter-spacing: normal;
+    }
+
+    a {
+      color: var(--primary);
+      font-weight: 600;
+      text-decoration: none;
+      transition: color 0.15s ease;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1px;
+    }
+
+    a:hover {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -310,12 +435,9 @@ function accountFields() {
 }
 
 function renderAccountField(field) {
-  return `<div class="field-label">${escapeHtml(field.label)}
-        <div class="account-field">
+  return `<label class="account-field">${escapeHtml(field.label)}<span class="account-domain">@itc.989567.xyz</span>
           <input name="${escapeHtml(field.name)}" autocomplete="${escapeHtml(field.autocomplete)}" required>
-          <span class="account-domain">@itc.989567.xyz</span>
-        </div>
-      </div>`;
+        </label>`;
 }
 
 function renderHiddenFields(hiddenFields) {
@@ -388,7 +510,81 @@ function oauthError(error, description, status) {
 function errorResponse(error) {
   const message = getErrorMessage(error);
   return html(
-    `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>登入失敗</title></head><body><h1>登入失敗</h1><p>${escapeHtml(message)}</p></body></html>`,
+    `<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登入失敗</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    :root {
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --bg-page: #f8fafc;
+      --bg-card: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      --danger: #ef4444;
+      --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: var(--bg-page);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    main {
+      width: min(420px, 100%);
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 36px 32px;
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--danger);
+    }
+    p {
+      margin: 0 0 24px;
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    a {
+      display: inline-block;
+      padding: 10px 20px;
+      background: #0f172a;
+      color: #ffffff;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      transition: background 0.15s ease;
+    }
+    a:hover {
+      background: #1e293b;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>登入失敗</h1>
+    <p>${escapeHtml(message)}</p>
+    <a href="javascript:history.back()">返回上一頁</a>
+  </main>
+</body>
+</html>`,
     { status: 400 }
   );
 }
