@@ -50,6 +50,9 @@ describe("Worker HTTP 端點", () => {
     assert.equal(response.status, 200);
     assert.match(html, /OpenAI SSO 登入/);
     assert.match(html, /註冊/);
+    assert.match(html, /account-field/);
+    assert.match(html, /account-domain/);
+    assert.match(html, /@itc\.989567\.xyz/);
     assert.doesNotMatch(html, /邀請碼/);
     assert.doesNotMatch(html, /@itc\.@itc\.989567\.xyz/);
   });
@@ -67,6 +70,9 @@ describe("Worker HTTP 端點", () => {
     assert.match(html, /OpenAI SSO 註冊/);
     assert.match(html, /邀請碼/);
     assert.match(html, /返回登入/);
+    assert.match(html, /account-field/);
+    assert.match(html, /account-domain/);
+    assert.match(html, /@itc\.989567\.xyz/);
     assert.doesNotMatch(html, /@itc\.@itc\.989567\.xyz/);
   });
 

@@ -268,9 +268,14 @@ function renderAuthPage({
     body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f7f7f5; color: #1f2328; }
     main { width: min(430px, calc(100vw - 32px)); background: #fff; border: 1px solid #d9d9d6; border-radius: 8px; padding: 30px; box-shadow: 0 18px 45px rgb(0 0 0 / 8%); }
     h1 { margin: 0 0 16px; font-size: 26px; line-height: 1.25; }
-    label { display: grid; gap: 8px; margin: 16px 0; font-size: 14px; font-weight: 600; }
+    label, .field-label { display: grid; gap: 8px; margin: 16px 0; font-size: 14px; font-weight: 600; }
     input { box-sizing: border-box; width: 100%; border: 1px solid #c8c8c4; border-radius: 6px; padding: 12px; font-size: 16px; }
     input:focus { outline: 2px solid #111; outline-offset: 2px; }
+    .account-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; overflow: hidden; border: 1px solid #c8c8c4; border-radius: 6px; background: #fff; }
+    .account-field:focus-within { outline: 2px solid #111; outline-offset: 2px; }
+    .account-field input { min-width: 0; border: 0; border-radius: 0; }
+    .account-field input:focus { outline: 0; }
+    .account-domain { align-self: stretch; display: grid; place-items: center; border-left: 1px solid #d9d9d6; padding: 0 12px; color: #5b5f66; background: #fafafa; font-size: 15px; font-weight: 700; white-space: nowrap; }
     button { width: 100%; border: 0; border-radius: 6px; padding: 13px 14px; margin-top: 10px; background: #111; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; }
     p { margin: 0 0 18px; color: #5b5f66; line-height: 1.6; }
     .hint { margin-top: 18px; text-align: center; font-size: 14px; }
@@ -284,8 +289,10 @@ function renderAuthPage({
     <form method="post" action="${escapeHtml(formAction)}">
       ${renderHiddenFields(hiddenFields)}
       ${fields
-        .map(
-          (field) => `<label>${escapeHtml(field.label)}
+        .map((field) =>
+          field.type === "account"
+            ? renderAccountField(field)
+            : `<label>${escapeHtml(field.label)}
         <input name="${escapeHtml(field.name)}" autocomplete="${escapeHtml(field.autocomplete)}" required>
       </label>`
         )
@@ -299,7 +306,16 @@ function renderAuthPage({
 }
 
 function accountFields() {
-  return [{ label: "帳號", name: "account", autocomplete: "username" }];
+  return [{ type: "account", label: "帳號", name: "account", autocomplete: "username" }];
+}
+
+function renderAccountField(field) {
+  return `<div class="field-label">${escapeHtml(field.label)}
+        <div class="account-field">
+          <input name="${escapeHtml(field.name)}" autocomplete="${escapeHtml(field.autocomplete)}" required>
+          <span class="account-domain">@itc.989567.xyz</span>
+        </div>
+      </div>`;
 }
 
 function renderHiddenFields(hiddenFields) {
