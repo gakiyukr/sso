@@ -63,23 +63,16 @@ function handleAuthorize(url, oidcService, config) {
   return html(renderLoginPage(authRequest, config));
 }
 
-function handleDirectLogin(oidcService, config) {
-  const authRequest = oidcService.validateAuthorizeRequest(buildDefaultAuthorizeParams(config));
-  return html(renderLoginPage(authRequest, config));
+function handleDirectLogin(_oidcService, config) {
+  if (!config.openaiLoginUrl) {
+    throw new Error("缺少必要設定：OPENAI_LOGIN_URL");
+  }
+  return redirectResponse(config.openaiLoginUrl);
 }
 
 function handleRegisterPage(url, oidcService, config) {
   const authRequest = oidcService.validateAuthorizeRequest(url.searchParams);
   return html(renderRegisterPage(authRequest, config));
-}
-
-function buildDefaultAuthorizeParams(config) {
-  return new URLSearchParams({
-    client_id: config.clientId,
-    redirect_uri: config.redirectUris[0],
-    response_type: "code",
-    scope: "openid email profile"
-  });
 }
 
 async function handleLogin(request, inviteService, oidcService, turnstileService) {

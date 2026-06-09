@@ -31,6 +31,7 @@ function createTestApp(envOverrides = {}, appOptions = {}) {
     OIDC_CLIENT_ID: "openai-client",
     OIDC_CLIENT_SECRET: "secret",
     ALLOWED_REDIRECT_URIS: "https://auth.openai.com/oidc/callback",
+    OPENAI_LOGIN_URL: "https://chatgpt.com/auth/login?sso=true&connection=conn_test",
     PRIVATE_JWK: JSON.stringify(privateJwk),
     ADMIN_TOKEN: "admin-token",
     ...envOverrides
@@ -49,53 +50,28 @@ async function withGlobalFetch(fetchImplementation, callback) {
 }
 
 describe("Worker HTTP 端點", () => {
-  it("/ 會顯示可直接登入 OpenAI 的表單", async () => {
-    const { app } = createTestApp({
-      TURNSTILE_SITE_KEY: "1x00000000000000000000AA"
-    });
+  it("/ 會導向 OpenAI SSO Tile URL", async () => {
+    const { app } = createTestApp();
     const response = await app.fetch(new Request("https://sso.example.com/"));
 
-    const html = await response.text();
-    assert.equal(response.status, 200);
-    assert.match(html, /OpenAI SSO 登入/);
-    assert.match(html, /name="client_id" value="openai-client"/);
-    assert.match(html, /name="redirect_uri" value="https:\/\/auth.openai.com\/oidc\/callback"/);
-    assert.match(html, /name="response_type" value="code"/);
-    assert.match(html, /name="scope" value="openid email profile"/);
-    assert.match(html, /cf-turnstile/);
-    assert.match(html, /data-sitekey="1x00000000000000000000AA"/);
-    assert.match(html, /data-action="login"/);
-    assert.match(html, /href="\/register\?client_id=openai-client/);
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get("location"), "https://chatgpt.com/auth/login?sso=true&connection=conn_test");
   });
 
-  it("/ 直接登入既有帳號後會導向 OpenAI callback", async () => {
-    const { store, app } = createTestApp();
-    await store.createInviteCode({ code: "JOIN", maxUses: 1 });
-    await store.createUserWithInvite({
-      email: "member@itc.989567.xyz",
-      displayName: "Neko Maau",
-      inviteCode: "JOIN"
+  it("/ 未設定 OpenAI SSO Tile URL 時會顯示設定錯誤", async () => {
+    const { app } = createTestApp({
+      OPENAI_LOGIN_URL: ""
     });
-    const body = new URLSearchParams({
-      account: "member",
-      client_id: "openai-client",
-      redirect_uri: "https://auth.openai.com/oidc/callback",
-      response_type: "code",
-      scope: "openid email profile"
+    const originalConsoleError = console.error;
+    console.error = () => {};
+
+    const response = await app.fetch(new Request("https://sso.example.com/")).finally(() => {
+      console.error = originalConsoleError;
     });
+    const html = await response.text();
 
-    const response = await app.fetch(
-      new Request("https://sso.example.com/login", {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body
-      })
-    );
-
-    assert.equal(response.status, 302);
-    const location = new URL(response.headers.get("location"));
-    assert.equal(location.origin + location.pathname, "https://auth.openai.com/oidc/callback");
-    assert.ok(location.searchParams.get("code"));
+    assert.equal(response.status, 400);
+    assert.match(html, /缺少必要設定：OPENAI_LOGIN_URL/);
   });
 
   it("/authorize 會顯示登入表單", async () => {

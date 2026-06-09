@@ -56,6 +56,7 @@ pnpm wrangler secret put TURNSTILE_SECRET_KEY
 - `ISSUER`
 - `OIDC_CLIENT_ID`
 - `ALLOWED_REDIRECT_URIS`
+- `OPENAI_LOGIN_URL`
 - `AUTHORIZATION_CODE_TTL_SECONDS`
 - `TOKEN_TTL_SECONDS`
 - `TURNSTILE_SITE_KEY`
@@ -77,7 +78,7 @@ pnpm wrangler secret put TURNSTILE_SECRET_KEY
 
 OpenAI 仍使用 `/authorize` 作為 authorization endpoint。使用者進入 `/authorize` 後會看到登入頁；若需要建立新帳號，從登入頁點選註冊連結進入 `/register`，OIDC 參數會自動保留。
 
-- 直接入口：訪問 `https://你的網域/` 會使用 `OIDC_CLIENT_ID` 與 `ALLOWED_REDIRECT_URIS` 的第一個 callback 自動生成登入流程，登入成功後會直接跳回 OpenAI callback。
+- 直接入口：訪問 `https://你的網域/` 會跳轉到 `OPENAI_LOGIN_URL`。這必須填 OpenAI SSO 設定頁提供的 Tile URL，例如 `https://chatgpt.com/auth/login?sso=true&connection=conn_...`。不能直接跳 OpenAI callback，否則 OpenAI 端沒有先建立 SSO session，會出現 `client_id_not_found_in_session`。
 - 登入頁：只輸入帳號，例如 `neko`。系統會使用 `neko@itc.989567.xyz` 登入。
 - 註冊頁：輸入帳號與邀請碼。註冊成功後會直接完成 OIDC 登入。
 

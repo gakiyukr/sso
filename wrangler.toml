@@ -6,6 +6,8 @@ compatibility_date = "2026-06-08"
 ISSUER = "https://auth.itc.989567.xyz"
 OIDC_CLIENT_ID = "openai-sso"
 ALLOWED_REDIRECT_URIS = "https://external.auth.openai.com/sso/oidc/rcNbLoDUwTBJQD5fvqOl6T2Q4/callback"
+# 直接訪問 / 時要跳轉到 OpenAI SSO 設定頁提供的 Tile URL。
+# OPENAI_LOGIN_URL = "https://chatgpt.com/auth/login?sso=true&connection=conn_replace"
 AUTHORIZATION_CODE_TTL_SECONDS = "300"
 TOKEN_TTL_SECONDS = "3600"
 TURNSTILE_SITE_KEY = "0x4AAAAAADhHJf3LLn2rA8VY"

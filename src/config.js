@@ -15,6 +15,7 @@ export function loadConfig(env = {}) {
     clientId,
     clientSecret,
     redirectUris,
+    openaiLoginUrl: optionalUrl(env.OPENAI_LOGIN_URL, "OPENAI_LOGIN_URL"),
     privateJwk: optional(env.PRIVATE_JWK),
     adminToken: optional(env.ADMIN_TOKEN),
     turnstileSiteKey: optional(env.TURNSTILE_SITE_KEY),
@@ -38,6 +39,18 @@ function required(value, name) {
 
 function requiredUrl(value, name) {
   const normalized = required(value, name);
+  try {
+    return new URL(normalized).toString();
+  } catch {
+    throw new Error(`${name} 必須是有效 URL`);
+  }
+}
+
+function optionalUrl(value, name) {
+  const normalized = optional(value);
+  if (!normalized) {
+    return "";
+  }
   try {
     return new URL(normalized).toString();
   } catch {
