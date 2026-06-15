@@ -72,12 +72,7 @@ OpenAI 的實際 callback URL 以 OpenAI 後台顯示為準，並放入 `ALLOWED
 
 本機 CLI 部署時，把 `database_id` 填回本機 `wrangler.toml`。Cloudflare 網頁版部署時，請在 Worker 的 D1 bindings 設定同一個 database，binding 名稱必須是 `DB`。
 
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "openai_oidc_sso"
-database_id = "你的_database_id"
-```
+公開的 `wrangler.example.toml` 不包含真實 D1 binding，避免 Cloudflare Builds 把占位 `database_id` 當真值部署。若你用 `npx wrangler deploy` 自動部署，部署時讀到的設定檔必須包含真實 D1 binding；若使用 Cloudflare Dashboard 部署，請在 Dashboard 綁定 D1。
 
 `binding` 必須維持 `DB`，因為 `src/index.js` 使用 `env.DB` 連線。
 
@@ -116,7 +111,12 @@ VALUES ('JOIN-2026', 100, 0, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
 
 Cloudflare Workers Builds 會在連接倉庫後部署 Worker。公開倉庫不提交真實 `wrangler.toml`，因此請在 Cloudflare Dashboard 中維護正式環境的 runtime 變數、Secrets 與 D1 綁定。若部署命令使用 `npx wrangler deploy`，請確保部署時讀到的 Wrangler 設定包含 `keep_vars = true`，避免覆蓋 Dashboard 中的 Variables。
 
-若你使用 GitHub Actions 或 Cloudflare Builds 執行 `npx wrangler deploy`，部署時讀到的 Wrangler 設定應包含 `keep_vars = true` 與 `DB` D1 binding，但不要包含 `[vars]`。這樣每次推送只部署程式碼，不會把公開倉庫裡的占位值寫回 Cloudflare，也不會清空 Dashboard 裡的 Text 變數。
+若你使用 GitHub Actions 或 Cloudflare Builds 執行 `npx wrangler deploy`，部署時讀到的 Wrangler 設定應包含 `keep_vars = true` 與真實 `DB` D1 binding，但不要包含 `[vars]`。這樣每次推送只部署程式碼，不會把公開倉庫裡的占位值寫回 Cloudflare，也不會清空 Dashboard 裡的 Text 變數。
+
+如果不想在 GitHub 保存 D1 `database_id`，不要讓公開倉庫裡的 `wrangler.example.toml` 帶 `[[d1_databases]]` 占位配置直接部署。可選做法：
+
+- 使用 Cloudflare Dashboard 設定 Worker、Text 變數、Secrets 與 D1 binding，避免用公開 config 覆蓋 Dashboard 設定。
+- 在 CI 裡從 GitHub Secrets 產生臨時 Wrangler config，臨時 config 只在構建機存在，包含 `keep_vars = true` 與真實 D1 binding，不包含 `[vars]`。
 
 ### 4. 綁定自訂網域
 
