@@ -13,6 +13,18 @@
 - UserInfo 端點：`/userinfo`
 - 邀請碼管理：`/admin/invite-codes`
 
+## 部署前準備
+
+你需要先準備：
+
+- Cloudflare 帳號，並啟用 Workers 與 D1。
+- 一個要給 OpenAI 使用的 HTTPS 網域，例如 `https://auth.example.com`。
+- OpenAI SSO 後台提供的 callback URL 與 Tile URL。
+- 一組 OIDC Client ID / Client Secret。Client ID 會公開在設定中，Client Secret 必須放到 Workers Secret。
+- 一個 RS256 私鑰 JWK，供 `/jwks.json` 與 token 簽章使用。
+
+此專案的 Worker 入口是 `src/index.js`，設定檔是 `wrangler.toml`。程式碼會從 `env.DB` 讀取 D1，因此 D1 綁定名稱必須是 `DB`。
+
 ## OpenAI 設定
 
 在 OpenAI SSO 設定頁選擇 **Custom OIDC**。建議填入：
@@ -27,22 +39,109 @@
 
 OpenAI 的實際 callback URL 以 OpenAI 後台顯示為準，並放入 `ALLOWED_REDIRECT_URIS`。若有多個 redirect URI，使用逗號分隔。
 
-## 建立 D1
+## Cloudflare 網頁版部署
 
-```powershell
-pnpm wrangler d1 create openai_oidc_sso
-pnpm wrangler d1 execute openai_oidc_sso --file schema.sql
+建議先建立 D1，再連接 Git 倉庫部署 Worker，這樣第一次部署就能帶上正確的 D1 綁定。
+
+### 1. 建立 D1 資料庫
+
+1. 進入 Cloudflare Dashboard。
+2. 到 **Storage & Databases → D1 SQL Database**。
+3. 選擇 **Create database**。
+4. Database name 建議填 `openai_oidc_sso`。
+5. 建立後複製 `database_id`。
+
+把 `database_id` 填回 `wrangler.toml`：
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "openai_oidc_sso"
+database_id = "你的_database_id"
 ```
 
-將 `wrangler d1 create` 回傳的 `database_id` 填入 `wrangler.toml`。
+`binding` 必須維持 `DB`，因為 `src/index.js` 使用 `env.DB` 連線。
+
+### 2. 初始化資料表
+
+1. 在 Cloudflare Dashboard 進入剛建立的 D1 database。
+2. 開啟 **Console**。
+3. 複製本倉庫的 `schema.sql` 全部內容並貼上。
+4. 選擇 **Execute**。
+5. 到 **Tables** 確認已建立 `users`、`invite_codes`、`authorization_codes`。
+
+也可以在 Console 執行這段確認：
+
+```sql
+SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;
+```
+
+初始化只會建立資料表，不會自動建立邀請碼。若暫時不想啟用 `/admin/invite-codes` API，可直接在 D1 Console 建立第一個邀請碼：
+
+```sql
+INSERT INTO invite_codes (code, max_uses, used_count, enabled, created_at)
+VALUES ('JOIN-2026', 100, 0, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+```
+
+### 3. 連接 Git 倉庫
+
+1. 把已更新 `wrangler.toml` 的程式碼推到 GitHub 或 GitLab。
+2. 在 Cloudflare Dashboard 進入 **Workers & Pages**。
+3. 選擇 **Create application**，再選擇連接 Git repository 的部署方式。
+4. 選擇此專案倉庫與 production branch。
+5. Build settings 建議：
+   - Root directory：如果倉庫根目錄就是此專案，留空。
+   - Build command：留空，這個 Worker 不需要前端建置。
+   - Deploy command：`npx wrangler deploy`。
+6. 建立後先完成下方「環境變數與 Secrets」設定，再重新部署。
+
+Cloudflare Workers Builds 會在連接倉庫後使用 Wrangler 部署 Worker。此倉庫已提供 `wrangler.toml`，因此不要讓 Cloudflare 自動產生新的 Workers 設定檔。
+
+### 4. 綁定自訂網域
+
+部署完成後，若要使用自己的網域：
+
+1. 進入 Worker 的 **Settings → Domains & Routes**。
+2. 選擇 **Add → Custom Domain**。
+3. 填入 `auth.example.com` 這類完整主機名稱。
+4. 等待 Cloudflare 建立 DNS 記錄與憑證。
+5. 將 `ISSUER` 改成這個正式網域，並重新部署。
+
+若先使用 `*.workers.dev` 測試，`ISSUER`、OpenAI OIDC endpoints 與 OpenAI 後台 callback 設定也必須使用同一個測試網域。
+
+## 環境變數與 Secrets
+
+Cloudflare Dashboard 內請到 Worker 的 **Settings → Variables and Secrets** 新增。選擇 **Text** 的值會以明文設定；選擇 **Secret** 的值儲存後不會再顯示。新增或修改後要按 **Deploy** 才會套用到 Worker。
+
+不要把 runtime 變數填到 **Settings → Build → Environment variables**。Build variables 只在 Cloudflare 建置階段可用，Worker 執行時讀不到。
+
+| 名稱 | 類型 | 必填 | 說明 |
+| --- | --- | --- | --- |
+| `ISSUER` | Text | 是 | Worker 對外 URL，不要帶結尾斜線，例如 `https://auth.example.com`。 |
+| `OIDC_CLIENT_ID` | Text | 是 | OpenAI Custom OIDC 使用的 Client ID，例如 `openai-sso`。 |
+| `ALLOWED_REDIRECT_URIS` | Text | 是 | OpenAI 後台顯示的 callback URL。多個值用逗號分隔。 |
+| `OPENAI_LOGIN_URL` | Text | 建議 | 直接訪問 `/` 時要跳轉的 OpenAI SSO Tile URL。不能填 OpenAI callback URL。 |
+| `AUTHORIZATION_CODE_TTL_SECONDS` | Text | 否 | 授權碼有效秒數，預設 `300`。 |
+| `TOKEN_TTL_SECONDS` | Text | 否 | Access token 與 ID token 有效秒數，預設 `3600`。 |
+| `TURNSTILE_SITE_KEY` | Text | 否 | Cloudflare Turnstile 前端公開 Site Key。 |
+| `PRIVATE_JWK` | Secret | 是 | RS256 私鑰 JWK，必須是單行 JSON，且包含 `kid`。 |
+| `OIDC_CLIENT_SECRET` | Secret | 是 | OpenAI Custom OIDC 使用的 Client Secret。 |
+| `ADMIN_TOKEN` | Secret | 否 | 呼叫 `/admin/invite-codes` 建立邀請碼時使用。 |
+| `TURNSTILE_SECRET_KEY` | Secret | 否 | Cloudflare Turnstile 後端 Secret Key。設定 Site Key 時也必須設定它。 |
+
+`wrangler.toml` 的 `[vars]` 可作為範例，但正式部署時仍建議在 Cloudflare Dashboard 確認 runtime 變數是否已正確套用。
 
 ## 產生 RS256 私鑰 JWK
+
+在本機執行：
 
 ```powershell
 node -e "crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']).then(k=>crypto.subtle.exportKey('jwk',k.privateKey)).then(j=>{j.kid='openai-sso-2026-06-08';j.alg='RS256';j.use='sig';console.log(JSON.stringify(j))})"
 ```
 
-把輸出設定為 Workers secret：
+把輸出整段 JSON 作為 `PRIVATE_JWK` Secret。請保持單行，不要在 Cloudflare Dashboard 內手動換行。
+
+若使用 Wrangler CLI 設定 Secret：
 
 ```powershell
 pnpm wrangler secret put PRIVATE_JWK
@@ -51,32 +150,18 @@ pnpm wrangler secret put ADMIN_TOKEN
 pnpm wrangler secret put TURNSTILE_SECRET_KEY
 ```
 
-非機密設定已放在 `wrangler.toml` 的 `[vars]` 中，使用 GitHub 或 Cloudflare 網頁版部署時會一起生效：
-
-- `ISSUER`
-- `OIDC_CLIENT_ID`
-- `ALLOWED_REDIRECT_URIS`
-- `OPENAI_LOGIN_URL`
-- `AUTHORIZATION_CODE_TTL_SECONDS`
-- `TOKEN_TTL_SECONDS`
-- `TURNSTILE_SITE_KEY`
-
-`ADMIN_TOKEN` 只在需要使用 `/admin/invite-codes` API 時才需要設定，建議作為 Workers secret 保存。若不設定，仍可直接在 D1 Console 用 SQL 建立邀請碼。
-
 ## Cloudflare Turnstile
 
-註冊頁支援 Cloudflare Turnstile 人機驗證。`TURNSTILE_SITE_KEY` 是前端公開值，已放在 `wrangler.toml`；`TURNSTILE_SECRET_KEY` 是後端驗證用密鑰，必須設為 Workers secret。
+註冊與登入頁支援 Cloudflare Turnstile 人機驗證。
 
-在 Cloudflare 網頁版部署時，請到 Workers 的 **Settings → Variables and Secrets**：
+- `TURNSTILE_SITE_KEY`：公開值，設定為 Text。
+- `TURNSTILE_SECRET_KEY`：後端驗證密鑰，設定為 Secret。
 
-- `TURNSTILE_SITE_KEY`：選擇一般變量，填入 Turnstile widget 的 Site Key。
-- `TURNSTILE_SECRET_KEY`：選擇 Secret，填入 Turnstile widget 的 Secret Key。
+兩個值都不設定時，系統會停用 Turnstile。只設定其中一個時，登入與註冊會因缺少必要設定而失敗。正式使用建議同時設定兩個值。
 
-若完全不設定 Turnstile 變量，系統會停用人機驗證；若只設定其中一個變量，登入與註冊會因缺少必要設定而失敗。正式使用請務必同時設定 `TURNSTILE_SITE_KEY` 與 `TURNSTILE_SECRET_KEY`。啟用後，登入既有帳號與註冊新帳號都需要通過 Turnstile。
+## 登入與註冊流程
 
-## 登入與註冊
-
-OpenAI 仍使用 `/authorize` 作為 authorization endpoint。使用者進入 `/authorize` 後會看到登入頁；若需要建立新帳號，從登入頁點選註冊連結進入 `/register`，OIDC 參數會自動保留。
+OpenAI 使用 `/authorize` 作為 authorization endpoint。使用者進入 `/authorize` 後會看到登入頁；若需要建立新帳號，從登入頁點選註冊連結進入 `/register`，OIDC 參數會自動保留。
 
 - 直接入口：訪問 `https://你的網域/` 會跳轉到 `OPENAI_LOGIN_URL`。這必須填 OpenAI SSO 設定頁提供的 Tile URL，例如 `https://chatgpt.com/auth/login?sso=true&connection=conn_...`。不能直接跳 OpenAI callback，否則 OpenAI 端沒有先建立 SSO session，會出現 `client_id_not_found_in_session`。
 - 登入頁：只輸入帳號，例如 `neko`。系統會使用 `neko@itc.989567.xyz` 登入。
@@ -85,6 +170,8 @@ OpenAI 仍使用 `/authorize` 作為 authorization endpoint。使用者進入 `/
 若使用者輸入完整信箱 `neko@itc.989567.xyz`，系統會自動視為帳號 `neko`。其他信箱域名會被拒絕。
 
 ## 建立邀請碼
+
+若已設定 `ADMIN_TOKEN`，可用管理 API 建立邀請碼：
 
 ```powershell
 curl -X POST https://你的網域/admin/invite-codes ^
@@ -105,6 +192,39 @@ curl -X POST https://你的網域/admin/invite-codes ^
 }
 ```
 
+也可以直接在 D1 Console 執行 SQL：
+
+```sql
+INSERT INTO invite_codes (code, max_uses, used_count, enabled, created_at)
+VALUES ('JOIN-2026', 100, 0, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+ON CONFLICT(code) DO UPDATE SET
+  max_uses = excluded.max_uses,
+  enabled = excluded.enabled;
+```
+
+## CLI 部署與資料庫初始化
+
+若偏好使用本機 CLI：
+
+```powershell
+pnpm install
+pnpm wrangler d1 create openai_oidc_sso
+```
+
+將 `wrangler d1 create` 回傳的 `database_id` 填入 `wrangler.toml` 後，初始化遠端 D1：
+
+```powershell
+pnpm wrangler d1 execute openai_oidc_sso --remote --file .\schema.sql
+```
+
+注意：不加 `--remote` 時，Wrangler 只會初始化本機 D1，不會影響 Cloudflare 上的正式資料庫。
+
+部署：
+
+```powershell
+pnpm wrangler deploy
+```
+
 ## 本地驗證
 
 ```powershell
@@ -113,11 +233,7 @@ pnpm test
 pnpm check
 ```
 
-## 部署
-
-```powershell
-pnpm wrangler deploy
-```
+## 部署後檢查
 
 部署後先開啟：
 
@@ -125,3 +241,13 @@ pnpm wrangler deploy
 - `https://你的網域/jwks.json`
 
 確認兩個端點正常後，再到 OpenAI 後台啟用 Custom OIDC。
+
+若 `/jwks.json` 回報 `缺少必要設定：PRIVATE_JWK`，代表 Secret 未設定或尚未重新部署。若 `/authorize` 回報不允許的 redirect URI，請回到 `ALLOWED_REDIRECT_URIS` 核對 OpenAI 後台顯示的 callback URL。
+
+## Cloudflare 官方參考
+
+- Workers runtime 環境變數與 Secret：https://developers.cloudflare.com/workers/configuration/environment-variables/
+- Workers Secret：https://developers.cloudflare.com/workers/configuration/secrets/
+- D1 建立、綁定與 Console 初始化：https://developers.cloudflare.com/d1/get-started/
+- Workers Git 部署設定：https://developers.cloudflare.com/workers/ci-cd/builds/configuration/
+- Workers 自訂網域：https://developers.cloudflare.com/workers/configuration/routing/custom-domains/
